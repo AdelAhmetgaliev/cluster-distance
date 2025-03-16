@@ -6,7 +6,6 @@ import (
 	"math"
 	"os"
 	"sort"
-	"strings"
 
 	"github.com/AdelAhmetgaliev/cluster-distance/internal/stardata"
 	"github.com/AdelAhmetgaliev/cluster-distance/internal/utils"
@@ -56,11 +55,6 @@ func main() {
 			continue
 		}
 		if ub < minUB && minUB-ub > delta {
-			continue
-		}
-
-		// Исключим из обработки звезды не принадлежащие ГП
-		if !strings.Contains(sd.SpType, "V") {
 			continue
 		}
 
