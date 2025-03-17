@@ -14,7 +14,6 @@ import (
 func main() {
 	// Считаем исходные данные из csv-файлов
 	starsList := utils.ReadStars("data/stars_NGC-869.csv")
-	giantColorIndexes := utils.ReadColorIndexes("data/bolometric_corrections_III.csv")
 	mainColorIndexes := utils.ReadColorIndexes("data/bolometric_corrections_V.csv")
 
 	// Определим минимальные и максимальные значения показателей цвета
@@ -60,7 +59,6 @@ func main() {
 		processedStarsList = append(processedStarsList, sd)
 	}
 	utils.WriteSliceToFile("data/main_color_indexes.dat", mainColorIndexes)
-	utils.WriteSliceToFile("data/giant_color_indexes.dat", giantColorIndexes)
 	stardata.WriteColorIndexesToFile("data/stars_color_indexes.dat", processedStarsList)
 
 	// Выделим три области звезд для их усреднения
