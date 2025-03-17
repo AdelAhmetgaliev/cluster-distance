@@ -6,6 +6,7 @@ set xtics -0.6, 0.4, 1.6
 
 set ylabel "Mᵥ"
 set yrange [20:-10]
+set ytics -10, 5, 20
 
 set grid
 set key top right box opaque
