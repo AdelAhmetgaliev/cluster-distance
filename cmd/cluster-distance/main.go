@@ -212,5 +212,7 @@ func main() {
 	}
 	averageDistance /= float64(len(starDistanceList))
 
-	fmt.Println(averageDistance)
+	fmt.Printf("Среднее расстояние до РС:\t%.1f\n", averageDistance)
+	fmt.Printf("Минимальное расстояние до РС:\t%.1f\n", starDistanceList[0])
+	fmt.Printf("Максимальное расстояние до РС:\t%.1f\n", starDistanceList[len(starDistanceList)-1])
 }
