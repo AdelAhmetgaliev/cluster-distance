@@ -2,6 +2,7 @@ package utils
 
 import (
 	"encoding/csv"
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -159,4 +160,19 @@ func createDefaultMagVToBV(data [][]string) (magVToBV [][2]float64) {
 	}
 
 	return magVToBV
+}
+
+func WriteSliceToFile(filePath string, data [][2]float64) {
+	file, err := os.Create(filePath)
+	if err != nil {
+		log.Fatalf("Can't create file: %v", err)
+	}
+	defer file.Close()
+
+	for _, chunk := range data {
+		_, err := fmt.Fprintf(file, "%.4f\t%.4f\n", chunk[0], chunk[1])
+		if err != nil {
+			log.Printf("Can't write chunk to file: %v\n", err)
+		}
+	}
 }

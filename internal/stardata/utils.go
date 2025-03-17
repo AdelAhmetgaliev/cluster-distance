@@ -1,6 +1,9 @@
 package stardata
 
 import (
+	"fmt"
+	"log"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -84,4 +87,48 @@ func CreateStarsList(data [][]string) (starsList []StarData) {
 	}
 
 	return starsList
+}
+
+func WriteColorIndexesToFile(filePath string, data []StarData) {
+	file, err := os.Create(filePath)
+	if err != nil {
+		log.Fatalf("Can't create file: %v", err)
+	}
+	defer file.Close()
+
+	for _, chunk := range data {
+		_, err := fmt.Fprintf(file, "%.4f\t%.4f\n", chunk.CI.BV, chunk.CI.UB)
+		if err != nil {
+			log.Printf("Can't write chunk to file: %v\n", err)
+		}
+	}
+}
+
+func WriteMagVToBVToFile(filePath string, data []StarData) {
+	file, err := os.Create(filePath)
+	if err != nil {
+		log.Fatalf("Can't create file: %v", err)
+	}
+	defer file.Close()
+
+	for _, chunk := range data {
+		_, err := fmt.Fprintf(file, "%.4f\t%.4f\n", chunk.CI.BV, chunk.Mag.V)
+		if err != nil {
+			log.Printf("Can't write chunk to file: %v\n", err)
+		}
+	}
+}
+
+func AverageColorIndexes(data []StarData) ColorIndex {
+	averageBV, averageUB := 0.0, 0.0
+	for _, sd := range data {
+		averageBV += sd.CI.BV
+		averageUB += sd.CI.UB
+	}
+
+	averageBV /= float64(len(data))
+	averageUB /= float64(len(data))
+	averageCI := NewColorIndex(averageBV, averageUB)
+
+	return averageCI
 }

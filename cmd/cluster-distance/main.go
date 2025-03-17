@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"os"
 	"sort"
 
 	"github.com/AdelAhmetgaliev/cluster-distance/internal/stardata"
@@ -60,9 +59,9 @@ func main() {
 
 		processedStarsList = append(processedStarsList, sd)
 	}
-	writeSliceToFile("data/main_color_indexes.dat", mainColorIndexes)
-	writeSliceToFile("data/giant_color_indexes.dat", giantColorIndexes)
-	writeColorIndexesFromStarDataToFile("data/stars_color_indexes.dat", processedStarsList)
+	utils.WriteSliceToFile("data/main_color_indexes.dat", mainColorIndexes)
+	utils.WriteSliceToFile("data/giant_color_indexes.dat", giantColorIndexes)
+	stardata.WriteColorIndexesToFile("data/stars_color_indexes.dat", processedStarsList)
 
 	// Выделим три области звезд для их усреднения
 	// Первая область BV > 0.8 UB > 0.0
@@ -82,14 +81,14 @@ func main() {
 
 		thirdSetOfStars = append(thirdSetOfStars, sd)
 	}
-	writeColorIndexesFromStarDataToFile("data/stars1_color_indexes.dat", firstSetOfStars)
-	writeColorIndexesFromStarDataToFile("data/stars2_color_indexes.dat", secondSetOfStars)
-	writeColorIndexesFromStarDataToFile("data/stars3_color_indexes.dat", thirdSetOfStars)
+	stardata.WriteColorIndexesToFile("data/stars1_color_indexes.dat", firstSetOfStars)
+	stardata.WriteColorIndexesToFile("data/stars2_color_indexes.dat", secondSetOfStars)
+	stardata.WriteColorIndexesToFile("data/stars3_color_indexes.dat", thirdSetOfStars)
 
 	// Усредним каждое из множеств
-	averageCIOfFirstSet := averageColorIndexesOfStarData(firstSetOfStars)
-	averageCIOfSecondSet := averageColorIndexesOfStarData(secondSetOfStars)
-	averageCIOfThirdSet := averageColorIndexesOfStarData(thirdSetOfStars)
+	averageCIOfFirstSet := stardata.AverageColorIndexes(firstSetOfStars)
+	averageCIOfSecondSet := stardata.AverageColorIndexes(secondSetOfStars)
+	averageCIOfThirdSet := stardata.AverageColorIndexes(thirdSetOfStars)
 	averageCIOfFirstSet.WriteToFile("data/stars1_average_color_index.dat")
 	averageCIOfSecondSet.WriteToFile("data/stars2_average_color_index.dat")
 	averageCIOfThirdSet.WriteToFile("data/stars3_average_color_index.dat")
@@ -116,7 +115,7 @@ func main() {
 
 		mainColorIndexesInterp = append(mainColorIndexesInterp, temp)
 	}
-	writeSliceToFile("data/main_color_indexes_interp.dat", mainColorIndexesInterp)
+	utils.WriteSliceToFile("data/main_color_indexes_interp.dat", mainColorIndexesInterp)
 
 	// Найдем пересечение с линией нормальных цветов для каждой звезды
 	var canBeCorrectedStarsList []stardata.StarData
@@ -145,12 +144,12 @@ func main() {
 		canBeCorrectedStarsList = append(canBeCorrectedStarsList, sd)
 	}
 
-	writeSliceToFile("data/stars_color_indexes_corrected.dat", correctedColorIndexes)
-	writeColorIndexesFromStarDataToFile("data/stars_color_indexes_can_be_corrected.dat", canBeCorrectedStarsList)
+	utils.WriteSliceToFile("data/stars_color_indexes_corrected.dat", correctedColorIndexes)
+	stardata.WriteColorIndexesToFile("data/stars_color_indexes_can_be_corrected.dat", canBeCorrectedStarsList)
 
 	magVToBV := utils.ReadDefaultMagVToBV("data/bolometric_corrections_V.csv")
-	writeSliceToFile("data/main_magv_to_bv.dat", magVToBV)
-	writeMagVToBVFromStarDataToFile("data/stars_magv_to_bv.dat", canBeCorrectedStarsList)
+	utils.WriteSliceToFile("data/main_magv_to_bv.dat", magVToBV)
+	stardata.WriteMagVToBVToFile("data/stars_magv_to_bv.dat", canBeCorrectedStarsList)
 
 	// Интерполируем ГР диаграмму для ГП
 	{
@@ -173,7 +172,7 @@ func main() {
 
 		mainMagVToBvInterp = append(mainMagVToBvInterp, temp)
 	}
-	writeSliceToFile("data/main_magv_to_bv_interp.dat", mainMagVToBvInterp)
+	utils.WriteSliceToFile("data/main_magv_to_bv_interp.dat", mainMagVToBvInterp)
 
 	// Сделаем список откорректированных звезд по показателю цвета
 	var correctedStarsList []stardata.StarData
@@ -184,7 +183,7 @@ func main() {
 
 		correctedStarsList = append(correctedStarsList, correctedSD)
 	}
-	writeMagVToBVFromStarDataToFile("data/stars_magv_to_bv_corrected.dat", correctedStarsList)
+	stardata.WriteMagVToBVToFile("data/stars_magv_to_bv_corrected.dat", correctedStarsList)
 
 	// Рассчитаем скорректированные значения звездной величины в фильтре V
 	var correctedMagVList []float64
@@ -214,63 +213,4 @@ func main() {
 	averageDistance /= float64(len(starDistanceList))
 
 	fmt.Println(averageDistance)
-}
-
-func writeSliceToFile(filePath string, data [][2]float64) {
-	file, err := os.Create(filePath)
-	if err != nil {
-		log.Fatalf("Can't create file: %v", err)
-	}
-	defer file.Close()
-
-	for _, chunk := range data {
-		_, err := fmt.Fprintf(file, "%.4f\t%.4f\n", chunk[0], chunk[1])
-		if err != nil {
-			log.Printf("Can't write chunk to file: %v\n", err)
-		}
-	}
-}
-
-func writeColorIndexesFromStarDataToFile(filePath string, data []stardata.StarData) {
-	file, err := os.Create(filePath)
-	if err != nil {
-		log.Fatalf("Can't create file: %v", err)
-	}
-	defer file.Close()
-
-	for _, chunk := range data {
-		_, err := fmt.Fprintf(file, "%.4f\t%.4f\n", chunk.CI.BV, chunk.CI.UB)
-		if err != nil {
-			log.Printf("Can't write chunk to file: %v\n", err)
-		}
-	}
-}
-
-func writeMagVToBVFromStarDataToFile(filePath string, data []stardata.StarData) {
-	file, err := os.Create(filePath)
-	if err != nil {
-		log.Fatalf("Can't create file: %v", err)
-	}
-	defer file.Close()
-
-	for _, chunk := range data {
-		_, err := fmt.Fprintf(file, "%.4f\t%.4f\n", chunk.CI.BV, chunk.Mag.V)
-		if err != nil {
-			log.Printf("Can't write chunk to file: %v\n", err)
-		}
-	}
-}
-
-func averageColorIndexesOfStarData(data []stardata.StarData) stardata.ColorIndex {
-	averageBV, averageUB := 0.0, 0.0
-	for _, sd := range data {
-		averageBV += sd.CI.BV
-		averageUB += sd.CI.UB
-	}
-
-	averageBV /= float64(len(data))
-	averageUB /= float64(len(data))
-	averageCI := stardata.NewColorIndex(averageBV, averageUB)
-
-	return averageCI
 }
