@@ -17,20 +17,20 @@ func main() {
 	mainColorIndexes := utils.ReadColorIndexes("data/bolometric_corrections_V.csv")
 
 	// Определим минимальные и максимальные значения показателей цвета
-	maxBV, minBV := -9999.0, 9999.0
-	maxUB, minUB := -9999.0, 9999.0
+	bvMax, bvMin := -9999.0, 9999.0
+	ubMax, ubMin := -9999.0, 9999.0
 	for _, ci := range mainColorIndexes {
-		if maxBV < ci[0] {
-			maxBV = ci[0]
+		if bvMax < ci[0] {
+			bvMax = ci[0]
 		}
-		if minBV > ci[0] {
-			minBV = ci[0]
+		if bvMin > ci[0] {
+			bvMin = ci[0]
 		}
-		if maxUB < ci[1] {
-			maxUB = ci[1]
+		if ubMax < ci[1] {
+			ubMax = ci[1]
 		}
-		if minUB > ci[1] {
-			minUB = ci[1]
+		if ubMin > ci[1] {
+			ubMin = ci[1]
 		}
 	}
 
@@ -42,17 +42,17 @@ func main() {
 
 		const delta = 0.3
 		bv, ub := ci[0], ci[1]
-		if bv > maxBV && bv-maxBV > delta {
+		if bv > bvMax && bv-bvMax > delta {
 			continue
 		}
-		if bv < minBV && minBV-bv > delta {
+		if bv < bvMin && bvMin-bv > delta {
 			continue
 		}
 
-		if ub > maxUB && ub-maxUB > delta {
+		if ub > ubMax && ub-ubMax > delta {
 			continue
 		}
-		if ub < minUB && minUB-ub > delta {
+		if ub < ubMin && ubMin-ub > delta {
 			continue
 		}
 
@@ -106,7 +106,7 @@ func main() {
 	}
 
 	var mainColorIndexesInterp [][2]float64
-	for x := minBV; x <= maxBV; x += 0.01 {
+	for x := bvMin; x <= bvMax; x += 0.01 {
 		var temp [2]float64
 		temp[0] = x
 		temp[1] = akimaInterp.Predict(x)
@@ -124,7 +124,7 @@ func main() {
 		k0 := sd.CI.UB - K*sd.CI.BV
 
 		bvIntersec := -100.0
-		for bv := minBV - 1; bv <= sd.CI.BV; bv += 0.0001 {
+		for bv := bvMin - 1; bv <= sd.CI.BV; bv += 0.0001 {
 			if math.Abs(akimaInterp.Predict(bv)-(k0+K*bv)) < 0.01 {
 				bvIntersec = bv
 			}
@@ -163,7 +163,7 @@ func main() {
 	}
 
 	var mainMagVToBvInterp [][2]float64
-	for x := minBV; x <= maxBV; x += 0.01 {
+	for x := bvMin; x <= bvMax; x += 0.01 {
 		var temp [2]float64
 		temp[0] = x
 		temp[1] = akimaInterp.Predict(x)
