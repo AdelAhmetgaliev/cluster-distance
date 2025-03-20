@@ -193,9 +193,12 @@ func main() {
 	// Рассчитаем расстояния до звезд
 	starDistanceList := make([]float64, 0, len(correctedStarsList))
 	for i, sd := range canBeCorrectedStarsList {
+		// mv - Mv = 5 * lg(r) - 5 + Rv * E(B-V)
+		const RV = 3.1 // Rv
+
 		excessColor := sd.CI.BV - correctedColorIndexes[i][0]
 		deltaMag := sd.Mag.V - correctedMagVList[i]
-		starDistance := math.Pow(10.0, (deltaMag+5.0-3.1*excessColor)/5.0)
+		starDistance := math.Pow(10.0, (deltaMag+5.0-RV*excessColor)/5.0)
 
 		starDistanceList = append(starDistanceList, starDistance)
 	}
