@@ -35,7 +35,7 @@ func main() {
 	}
 
 	// Исключим из обработки звезды, которые сильно выбиваются своими показателями цвета
-	var processedStarsList []stardata.StarData
+	processedStarsList := make([]stardata.StarData, 0, len(starsList))
 	for _, sd := range starsList {
 		var ci [2]float64
 		ci[0], ci[1] = sd.CI.BV, sd.CI.UB
@@ -116,7 +116,7 @@ func main() {
 	utils.WriteSliceToFile("data/main_color_indexes_interp.dat", mainColorIndexesInterp)
 
 	// Найдем пересечение с линией нормальных цветов для каждой звезды
-	var canBeCorrectedStarsList []stardata.StarData
+	canBeCorrectedStarsList := make([]stardata.StarData, 0, len(processedStarsList))
 	var correctedColorIndexes [][2]float64
 	for _, sd := range processedStarsList {
 		// Найдем уравнение линии покраснения: y[U - B] = k0 + K * x[B - V]
@@ -173,7 +173,7 @@ func main() {
 	utils.WriteSliceToFile("data/main_magv_to_bv_interp.dat", mainMagVToBvInterp)
 
 	// Сделаем список откорректированных звезд по показателю цвета
-	var correctedStarsList []stardata.StarData
+	correctedStarsList := make([]stardata.StarData, 0, len(canBeCorrectedStarsList))
 	for i, sd := range canBeCorrectedStarsList {
 		correctedSD := sd
 		correctedCI := stardata.NewColorIndex(correctedColorIndexes[i][0], correctedColorIndexes[i][1])
@@ -184,14 +184,14 @@ func main() {
 	stardata.WriteMagVToBVToFile("data/stars_magv_to_bv_corrected.dat", correctedStarsList)
 
 	// Рассчитаем скорректированные значения звездной величины в фильтре V
-	var correctedMagVList []float64
+	correctedMagVList := make([]float64, 0, len(correctedStarsList))
 	for _, sd := range correctedStarsList {
 		correctedMagV := akimaInterp.Predict(sd.CI.BV)
 		correctedMagVList = append(correctedMagVList, correctedMagV)
 	}
 
 	// Рассчитаем расстояния до звезд
-	var starDistanceList []float64
+	starDistanceList := make([]float64, 0, len(correctedStarsList))
 	for i, sd := range canBeCorrectedStarsList {
 		excessColor := sd.CI.BV - correctedColorIndexes[i][0]
 		deltaMag := sd.Mag.V - correctedMagVList[i]
