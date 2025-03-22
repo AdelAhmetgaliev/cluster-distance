@@ -11,7 +11,8 @@ set ytics -5.6, 2.0, 12.0
 set grid
 set key top right box opaque
 
-f(x) = -0.601 + 0.72 * x
+set arrow from 0.3096,11.096 to -0.2220,11.096 lw 2
+set arrow from -0.2220,11.096 to -0.2220,-2.068 lw 2
 
 set output "magv_to_bv.png"
 
