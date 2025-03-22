@@ -29,12 +29,12 @@ func ReadStars(starsFilePath string) []stardata.StarData {
 		log.Fatalf("Can't read data from csv: %v\n", err)
 	}
 
-	starsList := stardata.CreateStarsList(data)
+	starsList := createStarsSlice(data)
 
 	return starsList
 }
 
-func ReadColorIndexes(colorIndexesFilePath string) [][2]float64 {
+func ReadColorIndexes(colorIndexesFilePath string) []stardata.ColorIndex {
 	file, err := os.Open(colorIndexesFilePath)
 	if err != nil {
 		log.Fatalf("Can't open file: %v\n", err)
@@ -52,11 +52,93 @@ func ReadColorIndexes(colorIndexesFilePath string) [][2]float64 {
 		log.Fatalf("Can't read data from csv: %v\n", err)
 	}
 
-	colorIndexes := createDefaultColorIndexes(data)
+	colorIndexes := createColorIndexesSlice(data)
 	return colorIndexes
 }
 
-func createDefaultColorIndexes(data [][]string) (colorIndexes [][2]float64) {
+func createStarsSlice(data [][]string) []stardata.StarData {
+	indexColumn, nameColumn, uColumn, bColumn, vColumn, sptypeColumn := -1, -1, -1, -1, -1, -1
+	for j, field := range data[0] {
+		clearField := strings.TrimSpace(field)
+		switch clearField {
+		case "#":
+			indexColumn = j
+		case "identifier":
+			nameColumn = j
+		case "Mag U":
+			uColumn = j
+		case "Mag B":
+			bColumn = j
+		case "Mag V":
+			vColumn = j
+		case "spec. type":
+			sptypeColumn = j
+		}
+	}
+
+	starsList := make([]stardata.StarData, 0, len(data))
+	for i, line := range data {
+		if i == 0 {
+			continue
+		}
+
+		var index int
+		var name, sptype string
+		var u, b, v float64
+
+		for j, field := range line {
+			clearField := strings.TrimSpace(field)
+			switch j {
+			case indexColumn:
+				num, err := strconv.Atoi(clearField)
+				if err != nil {
+					break
+				}
+				index = num
+
+			case nameColumn:
+				name = clearField
+
+			case uColumn:
+				value, err := strconv.ParseFloat(clearField, 64)
+				if err != nil {
+					break
+				}
+				u = value
+
+			case bColumn:
+				value, err := strconv.ParseFloat(clearField, 64)
+				if err != nil {
+					break
+				}
+				b = value
+
+			case vColumn:
+				value, err := strconv.ParseFloat(clearField, 64)
+				if err != nil {
+					break
+				}
+				v = value
+
+			case sptypeColumn:
+				sptype = clearField
+			}
+		}
+
+		if u == 0 || b == 0 || v == 0 {
+			continue
+		}
+
+		mag := stardata.NewMagnitude(u, b, v)
+		sd := stardata.New(index, name, sptype, mag)
+
+		starsList = append(starsList, *sd)
+	}
+
+	return starsList
+}
+
+func createColorIndexesSlice(data [][]string) []stardata.ColorIndex {
 	bvColumn, ubColumn := -1, -1
 	for j, field := range data[0] {
 		clearField := strings.TrimSpace(field)
@@ -68,6 +150,7 @@ func createDefaultColorIndexes(data [][]string) (colorIndexes [][2]float64) {
 		}
 	}
 
+	colorIndexes := make([]stardata.ColorIndex, 0, len(data))
 	for i, line := range data {
 		if i == 0 {
 			continue
@@ -92,13 +175,13 @@ func createDefaultColorIndexes(data [][]string) (colorIndexes [][2]float64) {
 			}
 		}
 
-		colorIndexes = append(colorIndexes, colorIndex)
+		colorIndexes = append(colorIndexes, stardata.NewColorIndex(colorIndex[0], colorIndex[1]))
 	}
 
 	return colorIndexes
 }
 
-func ReadDefaultMagVToBV(filePath string) [][2]float64 {
+func ReadMagVToBV(filePath string) [][2]float64 {
 	file, err := os.Open(filePath)
 	if err != nil {
 		log.Fatalf("Can't open file: %v\n", err)

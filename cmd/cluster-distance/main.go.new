@@ -1,0 +1,211 @@
+package main
+
+import (
+	"fmt"
+	"log"
+	"math"
+	"sort"
+
+	"github.com/AdelAhmetgaliev/cluster-distance/internal/stardata"
+	"github.com/AdelAhmetgaliev/cluster-distance/internal/utils"
+	"gonum.org/v1/gonum/interp"
+)
+
+func main() {
+	// Считаем исходные данные из csv-файлов
+	starsList := utils.ReadStars("data/stars_NGC-869.csv")
+	mainColorIndexes := utils.ReadColorIndexes("data/bolometric_corrections_V.csv")
+
+	// Определим минимальные и максимальные значения показателей цвета
+	bvMax, bvMin := -9999.0, 9999.0
+	ubMax, ubMin := -9999.0, 9999.0
+	for _, ci := range mainColorIndexes {
+		if bvMax < ci[0] {
+			bvMax = ci[0]
+		}
+		if bvMin > ci[0] {
+			bvMin = ci[0]
+		}
+		if ubMax < ci[1] {
+			ubMax = ci[1]
+		}
+		if ubMin > ci[1] {
+			ubMin = ci[1]
+		}
+	}
+
+	// Исключим из обработки звезды, которые сильно выбиваются своими показателями цвета
+	processedStarsList := make([]stardata.StarData, 0, len(starsList))
+	for _, sd := range starsList {
+		var ci [2]float64
+		ci[0], ci[1] = sd.CI.BV, sd.CI.UB
+
+		const delta = 0.3
+		bv, ub := ci[0], ci[1]
+		if bv > bvMax && bv-bvMax > delta {
+			continue
+		}
+		if bv < bvMin && bvMin-bv > delta {
+			continue
+		}
+
+		if ub > ubMax && ub-ubMax > delta {
+			continue
+		}
+		if ub < ubMin && ubMin-ub > delta {
+			continue
+		}
+
+		processedStarsList = append(processedStarsList, sd)
+	}
+	utils.WriteSliceToFile("data/main_color_indexes.dat", mainColorIndexes)
+	stardata.WriteColorIndexesToFile("data/stars_color_indexes.dat", processedStarsList)
+
+	// Выделим три области звезд для их усреднения
+	// Первая область BV < 0.6 UB < 0.0
+	// Вторая область BV < 0.6 UB > 0.0
+	// Третья область BV > 0.6 UB > 0.0
+	var firstSetOfStars, secondSetOfStars, thirdSetOfStars []stardata.StarData
+	for _, sd := range processedStarsList {
+		if sd.CI.BV > 0.6 {
+			thirdSetOfStars = append(thirdSetOfStars, sd)
+			continue
+		}
+
+		if sd.CI.UB > 0.0 {
+			secondSetOfStars = append(secondSetOfStars, sd)
+			continue
+		}
+
+		firstSetOfStars = append(firstSetOfStars, sd)
+	}
+	stardata.WriteColorIndexesToFile("data/stars1_color_indexes.dat", firstSetOfStars)
+
+	// Усредним каждое из множеств
+	averageCIOfFirstSet := stardata.AverageColorIndexes(firstSetOfStars)
+
+	// Интерполируем линию нормальных цветов
+	var akimaInterp interp.AkimaSpline
+	{
+		var xValues, yValues []float64
+		for _, ci := range mainColorIndexes {
+			xValues = append(xValues, ci[0])
+			yValues = append(yValues, ci[1])
+		}
+
+		if err := akimaInterp.Fit(xValues, yValues); err != nil {
+			log.Fatalf("Can't interpolate: %v\n", err)
+		}
+	}
+
+	var mainColorIndexesInterp [][2]float64
+	for x := bvMin; x <= bvMax; x += 0.01 {
+		var temp [2]float64
+		temp[0] = x
+		temp[1] = akimaInterp.Predict(x)
+
+		mainColorIndexesInterp = append(mainColorIndexesInterp, temp)
+	}
+	utils.WriteSliceToFile("data/main_color_indexes_interp.dat", mainColorIndexesInterp)
+
+	// Найдем пересечение с линией нормальных среднего для первого множества
+	bvIntersecOfFirstSet := -100.0
+	ubIntersecOfFirstSet := -100.0
+	{
+		// Найдем уравнение линии покраснения: y[U - B] = k0 + K * x[B - V]
+		const K = 0.72 // Наклон линии покраснения
+		k0 := averageCIOfFirstSet.UB - K*averageCIOfFirstSet.BV
+
+		for bv := bvMin - 1; bv <= averageCIOfFirstSet.BV; bv += 0.0001 {
+			if math.Abs(akimaInterp.Predict(bv)-(k0+K*bv)) < 0.01 {
+				bvIntersecOfFirstSet = bv
+				ubIntersecOfFirstSet = (k0 + K*bv)
+			}
+		}
+	}
+
+	averageCIOfFirstSet.WriteToFile("data/average_ci_of_first_set.dat")
+	intersecCIOfFirstSet := stardata.NewColorIndex(bvIntersecOfFirstSet, ubIntersecOfFirstSet)
+	intersecCIOfFirstSet.WriteToFile("data/average_ci_of_first_set_corrected.dat")
+
+	// Скорректируем первое множество звезд по линии покраснения
+	correctedFirstSetOfStars := make([]stardata.StarData, 0, len(firstSetOfStars))
+	for _, sd := range firstSetOfStars {
+		newStarData := sd
+		newStarData.CI.BV -= (averageCIOfFirstSet.BV - bvIntersecOfFirstSet)
+		newStarData.CI.UB -= (averageCIOfFirstSet.UB - ubIntersecOfFirstSet)
+
+		correctedFirstSetOfStars = append(correctedFirstSetOfStars, newStarData)
+	}
+	stardata.WriteColorIndexesToFile("data/first_set_of_stars_corrected.dat", correctedFirstSetOfStars)
+
+	stardata.WriteMagVToBVToFile("data/first_set_of_stars_magv_to_bv.dat", firstSetOfStars)
+
+	magVToBV := utils.ReadDefaultMagVToBV("data/bolometric_corrections_V.csv")
+	utils.WriteSliceToFile("data/main_magv_to_bv.dat", magVToBV)
+
+	// Интерполируем ГР диаграмму для ГП
+	{
+		var xValues, yValues []float64
+		for _, ci := range magVToBV {
+			xValues = append(xValues, ci[0])
+			yValues = append(yValues, ci[1])
+		}
+
+		if err := akimaInterp.Fit(xValues, yValues); err != nil {
+			log.Fatalf("Can't interpolate: %v\n", err)
+		}
+	}
+
+	var mainMagVToBvInterp [][2]float64
+	for x := bvMin; x <= bvMax; x += 0.01 {
+		var temp [2]float64
+		temp[0] = x
+		temp[1] = akimaInterp.Predict(x)
+
+		mainMagVToBvInterp = append(mainMagVToBvInterp, temp)
+	}
+	utils.WriteSliceToFile("data/main_magv_to_bv_interp.dat", mainMagVToBvInterp)
+
+	// Рассчитаем среднюю звездную величину V первого множества
+	averageMagVOfFirstSet := 0.0
+	for _, sd := range correctedFirstSetOfStars {
+		averageMagVOfFirstSet += sd.Mag.V
+	}
+	averageMagVOfFirstSet /= float64(len(firstSetOfStars))
+
+	averageCIOfFirstSetCorrected := stardata.AverageColorIndexes(correctedFirstSetOfStars)
+
+	// Скорректируем первое множество звезд по ГР
+	magVIntersec := akimaInterp.Predict(averageCIOfFirstSetCorrected.BV)
+	for i := 0; i < len(correctedFirstSetOfStars); i++ {
+		correctedFirstSetOfStars[i].Mag.V -= (averageMagVOfFirstSet - magVIntersec)
+	}
+	stardata.WriteMagVToBVToFile("data/first_set_of_stars_magv_to_bv_corrected.dat", correctedFirstSetOfStars)
+
+	starDistanceList := make([]float64, 0, len(correctedFirstSetOfStars))
+	for i, sd := range correctedFirstSetOfStars {
+		// mv - Mv = 5 * lg(r) - 5 + Rv * E(B-V)
+		const RV = 3.1 // Rv
+
+		excessColor := firstSetOfStars[i].CI.BV - sd.CI.BV
+		deltaMag := firstSetOfStars[i].Mag.V - sd.Mag.V
+		starDistance := math.Pow(10.0, (deltaMag+5.0-RV*excessColor)/5.0)
+
+		starDistanceList = append(starDistanceList, starDistance)
+	}
+
+	sort.Slice(starDistanceList, func(i, j int) bool {
+		return starDistanceList[i] < starDistanceList[j]
+	})
+
+	averageDistance := 0.0
+	for _, d := range starDistanceList {
+		averageDistance += d
+	}
+	averageDistance /= float64(len(starDistanceList))
+
+	fmt.Printf("Среднее расстояние до РС:\t%.1f\n", averageDistance)
+	fmt.Printf("Минимальное расстояние до РС:\t%.1f\n", starDistanceList[0])
+	fmt.Printf("Максимальное расстояние до РС:\t%.1f\n", starDistanceList[len(starDistanceList)-1])
+}
